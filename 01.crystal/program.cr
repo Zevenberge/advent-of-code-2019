@@ -1,5 +1,10 @@
 def fuel(mass : Int32)
-   (mass / 3).to_i32 - 2
+   first_fuel = (mass / 3).to_i32 - 2
+   unless first_fuel <= 0
+      first_fuel + fuel first_fuel
+   else
+      0
+   end
 end
 
 lines = File.read_lines("input.txt")
