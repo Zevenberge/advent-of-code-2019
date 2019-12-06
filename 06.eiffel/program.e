@@ -30,7 +30,7 @@ feature {NONE}
 	   planet_to.set_previous(planet_from)
        end
 
-       count_orbits : INTEGER
+   count_orbits : INTEGER
        local
            planet : SPACE
        do
@@ -42,18 +42,30 @@ feature {NONE}
            end
        end
 
+    find_hops_to_santa : INTEGER
+       local
+          you : SPACE
+	  santa : SPACE
+	  ancestor : SPACE
+       do
+          you := stellation.get_planet("YOU")
+	  santa := stellation.get_planet("SAN")
+          ancestor := you.find_common_ancestor(santa)
+	  Result := (you.count_orbits - 1 - ancestor.count_orbits) + (santa.count_orbits - 1 - ancestor.count_orbits)
+       end
+
 feature
     stellation : STELLATION
 
 
     make
         local
-	   orbits: INTEGER
+	   steps: INTEGER
         do 
 	    create stellation.make
 	    read_file
-	    orbits := count_orbits
-            print(orbits)
+	    steps := find_hops_to_santa
+            print(steps)
         end
 
 end

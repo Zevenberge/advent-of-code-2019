@@ -2,9 +2,6 @@ class
     COM
 inherit
     SPACE
---        redefine
---	    count_orbits
---    end
 create
     make
 feature
@@ -16,4 +13,8 @@ feature
         do
 	    Result := 0
 	end
+    find_common_ancestor(other: SPACE):SPACE
+        do
+            Result := Current
+        end
 end
