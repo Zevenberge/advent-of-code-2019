@@ -9,11 +9,11 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 6. Eiffel
 7. Rust
 8. F#
-9. Bash
+9. D
 10. Javascript
 11. Clojure
 12. OCaml
-13. D
+13. Bash
 14. Go
 15. Forth
 16. Zig
