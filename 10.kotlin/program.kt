@@ -1,8 +1,6 @@
 import java.io.File
 import java.io.BufferedReader
-import kotlin.math.abs
-import kotlin.math.min
-import kotlin.math.max
+import kotlin.math.*
 
 data class Astroid(val x: Int, val y: Int)
 
@@ -74,6 +72,16 @@ fun countDetectableAstroids(from: Astroid, others: List<Astroid>) : Int {
     return count
 }
 
+fun bestPlaceForALaser(astroids: List<Astroid>) : Astroid {
+    val amountOfAstroidsAtBestPlace = maxDetectableAstroids(astroids)
+    for (astroid in astroids) {
+        if(countDetectableAstroids(astroid, astroids) == amountOfAstroidsAtBestPlace)
+            return astroid
+    }
+    // Can't actually happen
+    return Astroid(-1, -1)
+}
+
 fun maxDetectableAstroids(astroids: List<Astroid>): Int {
     val max = astroids.map {countDetectableAstroids(it, astroids)} .max()
     if (max != null) return max
@@ -92,11 +100,44 @@ fun createAstroids(input: List<String>) : List<Astroid> {
     return astroids
 }
 
+fun angle(base: Astroid, astroid: Astroid) : Double {
+    val diffX = astroid.x - base.x 
+    val diffY = astroid.y - base.y
+    val distance = sqrt((diffX * diffX + diffY * diffY).toDouble())
+    if(diffX >= 0 && diffY <= 0) { //>
+        // 1st quadrant
+        return asin(diffX/distance)
+    }
+    if(diffX >= 0 && diffY > 0) {
+        // 2nd quadrant
+        val angle = asin(diffX/distance)
+        return PI - angle
+    }
+    if(diffX < 0 && diffY > 0) {
+        // 3rd quadrant
+        val angle = asin(diffX/distance)
+        return PI - angle
+    }
+    val angle = asin(diffX/distance)
+    return angle + 2 * PI
+}
+
+fun shootAstroids(base: Astroid, astroids: List<Astroid>) {
+    val visibleAstroids = astroids.filter { canDetect(base, it, astroids)}.toMutableList()
+    visibleAstroids.sortBy({angle(base, it)})
+    for ((i, astroid) in visibleAstroids.withIndex()) {
+        print(i+1)
+        println(astroid)
+    }
+}
+
 fun main(args: Array<String>) {
     val bufferedReader = File("input.txt").bufferedReader()
 	val lineList = mutableListOf<String>()
     bufferedReader.useLines { lines -> lines.forEach { lineList.add(it) } }
     val astroids = createAstroids(lineList)
-    val max = maxDetectableAstroids(astroids)
-    println(max)
+    val base = bestPlaceForALaser(astroids)
+    //val base = Astroid(8,3)
+    println(base)
+    shootAstroids(base, astroids)
 }
