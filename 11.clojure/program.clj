@@ -26,7 +26,7 @@
 
 (defn forward [robot] (
     case (robot :facing)
-        0 {:x (x) :y (+ (y)y 1)}
+        0 {:x (x) :y (+ (y) 1)}
         3 {:x (- (x) 1) :y (y)}
         2 {:x (x) :y (- (y) 1)}
         1 {:x (+ (x) 1) :y (y)}
@@ -76,42 +76,42 @@
 
 (defn paint [coordinate, color] (
     def area (
-        assoc area coordinate (- color (int \0))
+        assoc area coordinate color
     )
 ))
 
-(defn write-color [writer] (
+(defn write-color [writer] (do
     (.write writer (get-color (robot :position)))
     (.newLine writer)
+    (.flush writer)
 ))
 
-(def cmd ["./intcode"])
-(def proc (.exec (Runtime/getRuntime) (into-array cmd)))
-(def output (io/reader (.getInputStream proc)))
-(def input (io/writer (.getOutputStream proc)))
+(let [cmd ["./intcode"]
+      proc (.exec (Runtime/getRuntime) (into-array cmd))
+      write-color write-color
+      firstOutput true]
+    (with-open [output (io/reader (.getInputStream proc))
+                input (io/writer (.getOutputStream proc))]
+        (while (.isAlive proc) (do
+            (println "Starting loop")
+            (write-color input)
+            (println "Written colour")
+            (let [line (.readLine output)] (do
+                (println "Received A")
+                (println line)
+                (paint (robot :position) line)
+                (println "Handled A")
+            ))
+            (println "Doing nothing")
+            (let [line (.readLine output)] (do
+                (println "Received B")
+                (println line)
+                (apply-movement line)
+                (println "Handled B")
+            ))
+        ))
+    )
+)
 
-(while (.isAlive proc) (
-    (println "Starting loop")
-    (.write input (get-color (robot :position)))
-    (.newLine input)
-    (.flush input)
-    (println "Written colour")
-    (let [line (.read (.getInputStream proc))] (
-        (println "Received A")
-        (println line)
-        (paint (robot :position) line)
-        (println "Handled A")
-    ))
-    (println "Doing nothing")
-    (let [line (.read (.getInputStream proc))] (
-        (println "Received B")
-        (println line)
-        (apply-movement line)
-        (println "Handled B")
-    ))
-))
 
-
-
-(println robot)
 (println (amount-of-painted-squares))
