@@ -6,7 +6,7 @@
                 :south 2
                 :west 3})
 
-(def area {{:x 0 :y 0}  "0"})
+(def area {{:x 0 :y 0}  "1"})
 
 (defn amount-of-painted-squares [] (
     count area
@@ -93,25 +93,48 @@
     (with-open [output (io/reader (.getInputStream proc))
                 input (io/writer (.getOutputStream proc))]
         (while (.isAlive proc) (do
-            (println "Starting loop")
             (write-color input)
-            (println "Written colour")
             (let [line (.readLine output)] (do
-                (println "Received A")
-                (println line)
                 (paint (robot :position) line)
-                (println "Handled A")
             ))
-            (println "Doing nothing")
             (let [line (.readLine output)] (do
-                (println "Received B")
-                (println line)
                 (apply-movement line)
-                (println "Handled B")
             ))
         ))
     )
 )
 
 
-(println (amount-of-painted-squares))
+(def xs (map :x (keys area)))
+(def ys (map :y (keys area)))
+
+(def left (apply min xs))
+(def right (apply max xs))
+(def top (apply max ys))
+(def bottom (apply min ys))
+
+(defn print-color [coordinate] (
+    if (= "1" (get-color coordinate)) (
+            print "#"
+    ) (
+            print "."
+    )
+))
+
+(defn print-row [y] (do
+    (loop [x left]
+        (when (<= x right)
+            (print-color {:x x :y y})
+            (recur (+ x 1))
+        )   
+    )
+    (println "")
+))
+
+(loop [y bottom] (
+    when (<= y top)
+    (print-row y)
+    (recur (+ y 1))
+))
+
+
