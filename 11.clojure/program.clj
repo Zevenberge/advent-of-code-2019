@@ -76,7 +76,7 @@
 
 (defn paint [coordinate, color] (
     def area (
-        assoc area coordinate color
+        assoc area coordinate (- color \0)
     )
 ))
 
@@ -85,25 +85,31 @@
     (.newLine writer)
 ))
 
-(def cmd ["./intcode"])
-(def proc (.exec (Runtime/getRuntime) (into-array cmd)))
-(def reader (io/reader (.getInputStream proc)))
-(def writer (io/writer (.getOutputStream proc)))
-(write-color writer)
-(def firstOutput true)
 
-(with-open [output reader
-            input writer]
-    (doseq [line (line-seq output)]
-      (
-          if (true? firstOutput) (
-              paint (robot :position) line
-          ) (
-              (apply-movement line)
-              (println robot)
-              (write-color input)
-          )
-      )
+(let [cmd ["./intcode"]
+      proc (.exec (Runtime/getRuntime) (into-array cmd))
+      write-color write-color
+      firstOutput true]
+    (with-open [output (io/reader (.getInputStream proc))
+                input (io/writer (.getOutputStream proc))]
+        (while (.isAlive proc) (
+            (println "Starting loop")
+            (write-color input)
+            (.write input (get-color (robot :position)))
+            (.newLine input)
+            (.flush input)
+            (println "Written colour")
+            (let [line (.read (.getInputStream proc))] (
+                (println "Received A")
+                (println line)
+                (paint (robot :position) line)
+            ))
+            (let [line (.readLine output)] (
+                (println "Received B")
+                (println line)
+                (apply-movement line)
+            ))
+        ))
     )
 )
 
