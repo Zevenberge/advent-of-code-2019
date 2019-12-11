@@ -10,7 +10,7 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 7. Rust
 8. F#
 9. D
-10. Javascript
+10. Kotlin
 11. Clojure
 12. OCaml
 13. Bash
@@ -29,7 +29,7 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 
 Backup:
 - Lua
-- Kotlin
+- Javascript
 - C#
 - Dart
 - Prolog
