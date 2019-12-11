@@ -6,14 +6,14 @@
                 :south 2
                 :west 3})
 
-(def area {{:x 0 :y 0}  0})
+(def area {{:x 0 :y 0}  "0"})
 
 (defn amount-of-painted-squares [] (
     count area
 ))
 
 (defn get-color [coordinate](
-    get area coordinate 0
+    get area coordinate "0"
 ))
 
 (def robot {
@@ -87,27 +87,25 @@
 
 (def cmd ["./intcode"])
 (def proc (.exec (Runtime/getRuntime) (into-array cmd)))
-(def output (io/reader (.getInputStream proc)))
-(def input (io/writer (.getOutputStream proc)))
-(write-color input)
+(def reader (io/reader (.getInputStream proc)))
+(def writer (io/writer (.getOutputStream proc)))
+(write-color writer)
 (def firstOutput true)
 
-(let [cmd ["./intcode"]
-      proc (.exec (Runtime/getRuntime) (into-array cmd))]
-    (with-open [output (io/reader (.getInputStream proc))
-                input (io/writer (.getOutputStream proc))]
-        (doseq [line (line-seq rdr)]
-          (
-              if (true? firstOutput) (
-                  paint (robot :position) line
-              ) (
-                  (apply-movement line)
-                  (println robot)
-                  (write-color input)
-              )
+(with-open [output reader
+            input writer]
+    (doseq [line (line-seq output)]
+      (
+          if (true? firstOutput) (
+              paint (robot :position) line
+          ) (
+              (apply-movement line)
+              (println robot)
+              (write-color input)
           )
-        )
+      )
     )
 )
+
 (println robot)
 (println (amount-of-painted-squares))
