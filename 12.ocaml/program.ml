@@ -9,6 +9,18 @@ let isSameStateAsBefore before now =
     before = now
   ;;
 
+let equalX before now =
+    before.position.x = now.position.x && before.velocity.x = now.velocity.x
+    ;;
+
+let equalY before now =
+    before.position.y = now.position.y && before.velocity.y = now.velocity.y
+    ;;
+
+let equalZ before now =
+    before.position.z = now.position.z && before.velocity.z = now.velocity.z
+    ;;
+
 let createMoon x y z =
     { position = { x = x; y = y; z = z}; velocity = {x = 0; y = 0; z = 0}}
   ;;
@@ -52,7 +64,6 @@ let printEnergy moons =
     moons |> List.map kineticEnergy |> sum |> Format.printf "Total energy %d\n"
   ;;
 
-
 let move moon =
     {
         position = {
@@ -73,14 +84,26 @@ let rec simulateXSteps x moons =
     else simulateXSteps (x - 1) (simulateStep moons)
     ;;
 
-let rec simulateUntilPreviousState steps before moons =
-  (* let () = printEnergy moons  in*)
-   if before = moons then steps
-   else if steps > 4686774924 then -1
-   else simulateUntilPreviousState (steps+1) before (simulateStep moons)
+let rec simulateUntilPreviousState steps before moons comparison =
+   if List.for_all2 comparison before moons then steps
+   else simulateUntilPreviousState (steps+1) before (simulateStep moons) comparison
+
+let rec gcd a b =
+    if b = 0 then a
+    else gcd b (a mod b)
+    ;;
+
+let findCommonPeriod x y z =
+    let denominator = gcd x (gcd y z) in
+    (x/denominator) * (y/denominator) * (z/denominator)
+   ;;
 
 let simulateUntilBefore moons =
-   simulateUntilPreviousState 1 moons (simulateStep moons)
+    let periodX = (simulateUntilPreviousState 1 moons (simulateStep moons) equalX) in
+    let periodY = (simulateUntilPreviousState 1 moons (simulateStep moons) equalY) in
+    let periodZ = (simulateUntilPreviousState 1 moons (simulateStep moons) equalZ) in
+    let () = Format.printf "(%d %d %d)\n" periodX periodY periodZ in
+   findCommonPeriod periodX periodY periodZ
    ;;
 
 let printMoon moon =
@@ -101,12 +124,5 @@ let moons = [
     (createMoon 2 (-7) 3);
     (createMoon 9 (-8) (-2))
 ];;
-
-(*let moons = [
-    (createMoon 16 (-8) 13);
-    (createMoon 4 10 10);
-    (createMoon 17 (-5) 6);
-    (createMoon 13 (-3) 0)
-];;*)
 
 moons |> simulateUntilBefore |> Format.printf "%d"
