@@ -192,8 +192,9 @@ class Computer
 
     private void writeOutput(Int value)
     {
-        import std.stdio : writeln;
+        import std.stdio : writeln, stdout;
         writeln(value);
+        stdout.flush();
     }
 
     private struct Op

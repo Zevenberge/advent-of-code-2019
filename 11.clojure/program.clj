@@ -6,7 +6,7 @@
                 :south 2
                 :west 3})
 
-(def area {{:x 0 :y 0}  "0"})
+(def area {{:x 0 :y 0}  "1"})
 
 (defn amount-of-painted-squares [] (
     count area
@@ -26,7 +26,7 @@
 
 (defn forward [robot] (
     case (robot :facing)
-        0 {:x (x) :y (+ (y)y 1)}
+        0 {:x (x) :y (+ (y) 1)}
         3 {:x (- (x) 1) :y (y)}
         2 {:x (x) :y (- (y) 1)}
         1 {:x (+ (x) 1) :y (y)}
@@ -80,32 +80,61 @@
     )
 ))
 
-(defn write-color [writer] (
+(defn write-color [writer] (do
     (.write writer (get-color (robot :position)))
     (.newLine writer)
+    (.flush writer)
 ))
 
-(def cmd ["./intcode"])
-(def proc (.exec (Runtime/getRuntime) (into-array cmd)))
-(def reader (io/reader (.getInputStream proc)))
-(def writer (io/writer (.getOutputStream proc)))
-(write-color writer)
-(def firstOutput true)
-
-(with-open [output reader
-            input writer]
-    (doseq [line (line-seq output)]
-      (
-          if (true? firstOutput) (
-              paint (robot :position) line
-          ) (
-              (apply-movement line)
-              (println robot)
-              (write-color input)
-          )
-      )
+(let [cmd ["./intcode"]
+      proc (.exec (Runtime/getRuntime) (into-array cmd))
+      write-color write-color
+      firstOutput true]
+    (with-open [output (io/reader (.getInputStream proc))
+                input (io/writer (.getOutputStream proc))]
+        (while (.isAlive proc) (do
+            (write-color input)
+            (let [line (.readLine output)] (do
+                (paint (robot :position) line)
+            ))
+            (let [line (.readLine output)] (do
+                (apply-movement line)
+            ))
+        ))
     )
 )
 
-(println robot)
-(println (amount-of-painted-squares))
+
+(def xs (map :x (keys area)))
+(def ys (map :y (keys area)))
+
+(def left (apply min xs))
+(def right (apply max xs))
+(def top (apply max ys))
+(def bottom (apply min ys))
+
+(defn print-color [coordinate] (
+    if (= "1" (get-color coordinate)) (
+            print "#"
+    ) (
+            print "."
+    )
+))
+
+(defn print-row [y] (do
+    (loop [x left]
+        (when (<= x right)
+            (print-color {:x x :y y})
+            (recur (+ x 1))
+        )   
+    )
+    (println "")
+))
+
+(loop [y bottom] (
+    when (<= y top)
+    (print-row y)
+    (recur (+ y 1))
+))
+
+
