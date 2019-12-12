@@ -2,7 +2,12 @@ open Format;;
 open List;;
 
 type vector3 = { x : int; y: int; z : int };;
+
 type moon = {position: vector3; velocity: vector3};;
+
+let isSameStateAsBefore before now =
+    before = now
+  ;;
 
 let createMoon x y z =
     { position = { x = x; y = y; z = z}; velocity = {x = 0; y = 0; z = 0}}
@@ -29,6 +34,25 @@ let rec determineVelocity others moon =
     | head :: tail -> determineVelocity tail (changeVelocity moon head)
   ;;
 
+let energy vector =
+    (abs vector.x) + (abs vector.y) + (abs vector.z)
+    ;;
+
+let kineticEnergy moon =
+    energy moon.velocity
+    ;;
+
+let totalEnergy moon =
+    (energy moon.position) * (energy moon.velocity)
+    ;;
+
+let sum = List.fold_left (+) 0;;
+
+let printEnergy moons =
+    moons |> List.map kineticEnergy |> sum |> Format.printf "Total energy %d\n"
+  ;;
+
+
 let move moon =
     {
         position = {
@@ -49,33 +73,40 @@ let rec simulateXSteps x moons =
     else simulateXSteps (x - 1) (simulateStep moons)
     ;;
 
-let energy vector =
-    (abs vector.x) + (abs vector.y) + (abs vector.z)
-    ;;
+let rec simulateUntilPreviousState steps before moons =
+  (* let () = printEnergy moons  in*)
+   if before = moons then steps
+   else if steps > 4686774924 then -1
+   else simulateUntilPreviousState (steps+1) before (simulateStep moons)
 
-let totalEnergy moon =
-    (energy moon.position) * (energy moon.velocity)
-    ;;
+let simulateUntilBefore moons =
+   simulateUntilPreviousState 1 moons (simulateStep moons)
+   ;;
 
 let printMoon moon =
     Format.printf "(%d %d %d) with (%d %d %d)\n" moon.position.x moon.position.y moon.position.z moon.velocity.x moon.velocity.y moon.velocity.z
   ;;
 
-let sum = List.fold_left (+) 0;;
-
-let printEnergy moons =
-    moons |> List.map totalEnergy |> sum |> Format.printf "Total energy %d"
-  ;;
-
 let moon = createMoon 1 2 3;;
-let moons = [
+(*let moons = [
     (createMoon (-1) 0 2);
     (createMoon 2 (-10) (-7));
     (createMoon 4 (-8) 8);
     (createMoon 3 5 (-1))
+];;*)
+
+let moons = [
+    (createMoon (-8) (-10) 0);
+    (createMoon 5 5 10);
+    (createMoon 2 (-7) 3);
+    (createMoon 9 (-8) (-2))
 ];;
 
+(*let moons = [
+    (createMoon 16 (-8) 13);
+    (createMoon 4 10 10);
+    (createMoon 17 (-5) 6);
+    (createMoon 13 (-3) 0)
+];;*)
 
-print_newline;;
-moons |> simulateXSteps 1000 |> printEnergy;;
-print_newline;;
+moons |> simulateUntilBefore |> Format.printf "%d"
