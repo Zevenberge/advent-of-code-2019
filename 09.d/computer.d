@@ -1,12 +1,16 @@
 module computer;
 
+import std.concurrency;
+
 alias Int  = long;
 
 class Computer
 {
-    this(Int[] program)
+    this(Int[] program, Tid stdout)
     {
         _program = program;
+	    _memory[0] = 2;
+        _out = stdout;
     }
 
     void run()
@@ -61,7 +65,8 @@ class Computer
                 case 99:
                     return;
                 default:
-                    assert(false, "Unknown operation");
+                    import std.conv: to;
+                    assert(false, "Unknown operation " ~ operation.to!string);
             }
         }
     }
@@ -69,16 +74,24 @@ class Computer
     private Int[] _program;
     private Int[Int] _memory;
     private Int _relativeBase = 0;
+    private Tid _out;
+
+    private Int asMemoryIndex(Int index)
+    {
+        return (index -  cast(Int)(_program.length));
+    }
 
     private Int readValue(Int index)
     {
-        //import std.stdio: writeln;
+        import std.stdio: writeln;
         //writeln(index);
+        //1writeln(_program.length);
         if(index < _program.length)
         {
             return _program[index];
         }
-        Int memoryIndex = cast(Int)(index - _program.length);
+        Int memoryIndex = asMemoryIndex(index);
+        //writeln(memoryIndex);
         if(memoryIndex in _memory)
             return _memory[memoryIndex];
         return 0;
@@ -172,7 +185,7 @@ class Computer
         {
             return _program[indexToReplace];
         }
-        Int memoryIndex = cast(Int)(indexToReplace - _program.length);
+        Int memoryIndex = asMemoryIndex(indexToReplace);
         _memory[memoryIndex] = 0;
         return _memory[memoryIndex];
     }
@@ -192,9 +205,10 @@ class Computer
 
     private void writeOutput(Int value)
     {
-        import std.stdio : writeln, stdout;
-        writeln(value);
-        stdout.flush();
+        //import std.stdio : writeln, stdout;
+        _out.send(value);
+        //writeln(value);
+        //stdout.flush();
     }
 
     private struct Op
