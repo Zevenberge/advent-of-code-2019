@@ -186,7 +186,7 @@ class Computer
             return _program[indexToReplace];
         }
         Int memoryIndex = asMemoryIndex(indexToReplace);
-        _memory[memoryIndex] = 0;
+        if(!(memoryIndex in _memory)) _memory[memoryIndex] = 0;
         return _memory[memoryIndex];
     }
 
