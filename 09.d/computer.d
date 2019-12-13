@@ -1,16 +1,16 @@
 module computer;
 
 import std.concurrency;
+import game : AI;
 
 alias Int  = long;
 
 class Computer
 {
-    this(Int[] program, Tid stdout)
+    this(Int[] program, AI ai)
     {
         _program = program;
-	    _memory[0] = 2;
-        _out = stdout;
+        _ai = ai;
     }
 
     void run()
@@ -74,7 +74,7 @@ class Computer
     private Int[] _program;
     private Int[Int] _memory;
     private Int _relativeBase = 0;
-    private Tid _out;
+    private AI _ai;
 
     private Int asMemoryIndex(Int index)
     {
@@ -83,15 +83,11 @@ class Computer
 
     private Int readValue(Int index)
     {
-        import std.stdio: writeln;
-        //writeln(index);
-        //1writeln(_program.length);
         if(index < _program.length)
         {
             return _program[index];
         }
         Int memoryIndex = asMemoryIndex(index);
-        //writeln(memoryIndex);
         if(memoryIndex in _memory)
             return _memory[memoryIndex];
         return 0;
@@ -197,18 +193,12 @@ class Computer
 
     private Int readInput()
     {
-        import std.stdio : readf;
-        Int a;
-        readf!" %d"(a);
-        return a;
+        return _ai.decide;
     }
 
     private void writeOutput(Int value)
     {
-        //import std.stdio : writeln, stdout;
-        _out.send(value);
-        //writeln(value);
-        //stdout.flush();
+        _ai.receive(value);
     }
 
     private struct Op
