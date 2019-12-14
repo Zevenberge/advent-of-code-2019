@@ -76,8 +76,8 @@ func createItems(input []string) []*Item {
 	return items
 }
 
-func readFile() []string {
-	file, _ := os.Open("input.txt")
+func readFile(filename string) []string {
+	file, _ := os.Open(filename)
 	defer file.Close()
 	lines := []string{}
 	scanner := bufio.NewScanner(file)
@@ -87,23 +87,24 @@ func readFile() []string {
 	return lines
 }
 
-func consumeFromLeftovers(ingredient *Material, leftovers []*Material) {
+func consumeFromLeftovers(ingredient Material, leftovers []*Material) int {
 	for _, rest := range leftovers {
 		if ingredient.Thing.Name == rest.Thing.Name {
-			amountRequired := ingredient.Quantity
-			ingredient.Quantity = int(math.Max(0, float64(amountRequired - rest.Quantity)))
-			rest.Quantity = int(math.Max(0, float64(rest.Quantity - amountRequired)))
+			amountRequired := int(math.Max(0, float64(ingredient.Quantity - rest.Quantity)))
+			rest.Quantity = int(math.Max(0, float64(rest.Quantity - ingredient.Quantity)))
+			return amountRequired
 		}
 	}
+	return ingredient.Quantity
 }
 
-func howOftenDoINeedToFuse(result Material, reaction Reaction) int {
-	return int(math.Ceil(float64(result.Quantity)/float64(reaction.ProducedQuantity)))
+func howOftenDoINeedToFuse(requiredQuantity int, reaction Reaction) int {
+	return int(math.Ceil(float64(requiredQuantity)/float64(reaction.ProducedQuantity)))
 }
 
-func produceLeftovers(product Material, amountOfTimesReactionIsRequired int, 
+func produceLeftovers(product Material, requiredQuantity int, amountOfTimesReactionIsRequired int, 
 	reaction Reaction, leftovers []*Material) []*Material {
-	overproduce := reaction.ProducedQuantity * amountOfTimesReactionIsRequired - product.Quantity
+	overproduce := reaction.ProducedQuantity * amountOfTimesReactionIsRequired - requiredQuantity
 	if overproduce > 0 {
 		for _, rest := range leftovers {
 			if rest.Thing.Name == product.Thing.Name {
@@ -122,9 +123,9 @@ func findOreForItem(ingredient Material, leftovers []*Material) (int, []*Materia
 	}
 	ores := 0
 	reaction := ingredient.Thing.Reactions[0]
-	consumeFromLeftovers(&ingredient, leftovers)
-	amountOfTimesReactionIsRequired := howOftenDoINeedToFuse(ingredient, reaction)
-	leftovers = produceLeftovers(ingredient, amountOfTimesReactionIsRequired, reaction, leftovers)
+	quantity := consumeFromLeftovers(ingredient, leftovers)
+	amountOfTimesReactionIsRequired := howOftenDoINeedToFuse(quantity, reaction)
+	leftovers = produceLeftovers(ingredient, quantity, amountOfTimesReactionIsRequired, reaction, leftovers)
 	for _, input := range reaction.Input {
 		var usedOre int
 		usedOre, leftovers = findOreForItem(Material{Thing: input.Thing, Quantity: input.Quantity * amountOfTimesReactionIsRequired}, leftovers)
@@ -133,17 +134,39 @@ func findOreForItem(ingredient Material, leftovers []*Material) (int, []*Materia
 	return ores, leftovers
 }
 
-func findOreForFuel(items []*Item) int {
+func findOreForFuel(items []*Item) (int, []*Material) {
 	fuel, items := findOrCreateItem("FUEL", items)
 	ores := 0
 	leftovers := []*Material{}
 	ores, leftovers = findOreForItem(Material{Thing: fuel, Quantity: 1}, leftovers)
-	return ores
+	fmt.Printf("Leftovers after one lap: %v \n", leftovers)
+	return ores, leftovers
+}
+
+func findFuelForATrillionOres(items []*Item) int {
+	fuel, items := findOrCreateItem("FUEL", items)
+	leftovers := []*Material{}
+	ores := 1000000000000
+	fuels := 0
+	//var usedOreForOneTrip int
+	//usedOreForOneTrip, leftovers := findOreForFuel(items)
+	for ; ores > 0 ; {
+		var usedOre int
+		usedOre, leftovers = findOreForItem(Material{Thing: fuel, Quantity: 1}, leftovers)
+		fuels += 1;
+		ores -= usedOre
+	}
+	if ores < 0 {
+		fuels -= 1
+	}
+	return fuels
 }
 
 func main() {
-	lines := readFile()
+	lines := readFile("input.txt")
 	items := createItems(lines)
-	result := findOreForFuel(items)
-	fmt.Printf("Total ores needed %d \n", result)
+	//result, _ := findOreForFuel(items)
+	//fmt.Printf("Total ores needed %d \n", result)
+	fuels := findFuelForATrillionOres(items)
+	fmt.Printf("Total fuel created %d\n", fuels)
 }
