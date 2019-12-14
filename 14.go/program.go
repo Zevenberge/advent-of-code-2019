@@ -139,22 +139,30 @@ func findOreForFuel(items []*Item) (int, []*Material) {
 	ores := 0
 	leftovers := []*Material{}
 	ores, leftovers = findOreForItem(Material{Thing: fuel, Quantity: 1}, leftovers)
-	fmt.Printf("Leftovers after one lap: %v \n", leftovers)
 	return ores, leftovers
 }
 
 func findFuelForATrillionOres(items []*Item) int {
 	fuel, items := findOrCreateItem("FUEL", items)
+	usedOreForOneTrip, _ := findOreForFuel(items)
 	leftovers := []*Material{}
-	ores := 1000000000000
+	var ores int64
+	ores = 1000000000000
 	fuels := 0
-	//var usedOreForOneTrip int
-	//usedOreForOneTrip, leftovers := findOreForFuel(items)
+	i := 0
+	
 	for ; ores > 0 ; {
+		naieveEstimate := ores/int64(usedOreForOneTrip)
+		naieveEstimate = int64(math.Max(1, float64(naieveEstimate)))
 		var usedOre int
-		usedOre, leftovers = findOreForItem(Material{Thing: fuel, Quantity: 1}, leftovers)
-		fuels += 1;
-		ores -= usedOre
+		usedOre, leftovers = findOreForItem(Material{Thing: fuel, Quantity: int(naieveEstimate)}, leftovers)
+		fuels += int(naieveEstimate);
+		ores -= int64(usedOre)
+		i += 1
+		if i % 100 == 0 {
+			fmt.Printf("Ores left %d\n", ores)
+		}
+	//	totalUsedOre += usedOre
 	}
 	if ores < 0 {
 		fuels -= 1
