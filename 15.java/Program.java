@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 public class Program {
@@ -38,38 +39,43 @@ public class Program {
         this.input = new BufferedWriter(input);
         this.position = new Coordinate(0, 0);
         this.walls = new ArrayList<>();
-        this.visitedPositions = new Stack<>();
+        this.walkablePositions = new Stack<>();
     }
 
     private final BufferedReader output;
     private final BufferedWriter input;
 
     public void run() throws IOException {
-        visitedPositions.add(this.position);
-        int amountOfSteps = walk();
+        walkablePositions.add(this.position);
+        walk(-1);
         printWalls();
-        System.out.println(amountOfSteps);
-        System.out.println(visitedPositions.size());
-        minimize();
+        fillWithOxigen();
     }
 
-    private void minimize() {
-        Coordinate[] route = new Coordinate[visitedPositions.size()];
-        visitedPositions.toArray(route);
-        System.out.println(route[0]);
-        System.out.println(position);
-        List<Coordinate> optimisedRoute = new ArrayList<>();
-        int cursor = 0;
-        while (cursor < route.length - 1) {
-            for (int j = route.length - 1; j > cursor; --j) {
-                if (route[j].isAdjescent(route[cursor])) {
-                    optimisedRoute.add(route[j]);
-                    cursor = j;
-                    break;
+    private void fillWithOxigen() {
+        int minutes = 0;
+        while(thereIsStillSomeRoomsWithoutOxigen()) {
+            for(Coordinate roomWithOxigen: getRoomsWithOxigen()) {
+                for(Coordinate other: walkablePositions) {
+                    other.fill(roomWithOxigen);
                 }
             }
+            minutes++;
         }
-        System.out.println(optimisedRoute.size());
+        System.out.print(minutes);
+    }
+
+    private boolean thereIsStillSomeRoomsWithoutOxigen()
+    {
+        for(Coordinate room : walkablePositions) {
+            if(!room.hasOxigen()) return true;
+        }
+        return false;
+    }
+
+    private List<Coordinate> getRoomsWithOxigen()
+    {
+        return walkablePositions.stream().filter(c -> c.hasOxigen()).collect(Collectors.toList());
     }
 
     private void printWalls() {
@@ -86,11 +92,11 @@ public class Program {
                     System.out.print('X');
                 } else if (coord.equals(position)) {
                     System.out.print("*");
-                } else if (walls.contains(coord) && visitedPositions.contains(coord)) {
+                } else if (walls.contains(coord) && walkablePositions.contains(coord)) {
                     System.out.print('!');
                 } else if (walls.contains(coord)) {
                     System.out.print('#');
-                } else if (visitedPositions.contains(coord)) {
+                } else if (walkablePositions.contains(coord)) {
                     System.out.print('.');
                 } else {
                     System.out.print(' ');
@@ -102,61 +108,54 @@ public class Program {
 
     private Coordinate position;
     private List<Coordinate> walls;
-    private List<Coordinate> visitedPositions;
+    private List<Coordinate> walkablePositions;
 
-    private int walk() throws IOException {
-        List<Integer> directions = composePossibleMovements();
+    private void walk(int lastMovement) throws IOException {
+        List<Integer> directions = composePossibleMovements(lastMovement);
         for (int direction : directions) {
             Coordinate newPosition = this.position.move(direction);
-            if (visitedPositions.contains(newPosition)) {
-                continue;
-            }
             execute(direction);
             String line = output.readLine();
             int response = Integer.parseInt(line);
             if(response == WALL) {
-                assert(!visitedPositions.contains(newPosition));
+                assert(!walkablePositions.contains(newPosition));
                 walls.add(newPosition);
                 continue;
             }
             this.position = newPosition;
-            this.visitedPositions.add(this.position);
+            this.walkablePositions.add(this.position);
             if(response == OXYGEN) {
                 System.out.println("Found");
-                return 1;
+                this.position.isOxigenSource();
+                response = MOVE;
             }
             if(response == MOVE) {
                 assert(!walls.contains(this.position));
-                int result = walk();
-                if(result != FAILURE) {
-                    return 1 + result;
-                }
+                walk(direction);
                 execute(inverse(direction));
                 output.readLine();
-                this.visitedPositions.remove(position);
                 this.position = this.position.moveBack(direction);
             } else {
                 assert(false);
             }
             
         }
-        return FAILURE;
     }
 
-    private List<Integer> composePossibleMovements() {
+    private List<Integer> composePossibleMovements(int lastMovement) {
         List<Integer> directions = new ArrayList<>();
-        //if(lastMovement != SOUTH) {
+        if(lastMovement != SOUTH) {
             directions.add(NORTH);
-        //}
-        //if(lastMovement != NORTH) {
+        }
+        if(lastMovement != NORTH) {
             directions.add(SOUTH);
-        //}
-        //if(lastMovement != EAST) {
+        }
+        if(lastMovement != EAST) {
             directions.add(WEST);
-        //}
-        //if(lastMovement != WEST) {
+        }
+        if(lastMovement != WEST) {
             directions.add(EAST);
-        //}
+        }
         return directions;
     }
 
@@ -191,6 +190,21 @@ public class Program {
         }
         public final int x;
         public final int y;
+
+        private boolean oxigen;
+        public boolean hasOxigen() {
+            return oxigen;
+        }
+
+        public void isOxigenSource() {
+            oxigen = true;
+        }
+
+        public void fill(Coordinate other) {
+            if(other.oxigen && isAdjescent(other)) {
+                oxigen = true;
+            }
+        }
 
         public Coordinate move(int movement) {
             switch (movement) {
