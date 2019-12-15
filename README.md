@@ -15,10 +15,10 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 12. OCaml
 13. Bash
 14. Go
-15. Forth
+15. Java
 16. Zig
 17. Fortran
-18. Java
+18. Forth
 19. Julia
 20. Janus
 21. Erlang
