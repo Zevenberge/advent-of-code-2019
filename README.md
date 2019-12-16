@@ -16,8 +16,8 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 13. Bash
 14. Go
 15. Java
-16. Zig
-17. Fortran
+16. ~~Fortran~~ D
+17. Zig
 18. Forth
 19. Julia
 20. Janus
