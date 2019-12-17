@@ -17,20 +17,20 @@ The advent of code is an annual coding challenge. Every day, from the 1st of dec
 14. Go
 15. Java
 16. ~~Fortran~~ D
-17. Zig
-18. Forth
-19. Julia
-20. Janus
-21. Erlang
-22. Assembly
-23. Scala
-24. Ada
-25. Nim
+17. Nim
+18. Zig
+19. Ada
+20. Julia
+21. Scala
+22. Erlang
+23. Javascript
+24. C#
+25. D
 
 Backup:
 - Lua
-- Javascript
-- C#
+- Assembly
+- Janus
 - Dart
 - Prolog
 - Pascal
@@ -39,5 +39,6 @@ Backup:
 - J
 - ParaSail
 - Smalltalk
+- Forth
 
 The list is subject to change if a problem is too hard to solve with the given language (I only have so much time in a day) or if I want to try a different language over one I already know (i.e. Kotlin over Javascript).
