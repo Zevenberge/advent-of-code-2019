@@ -2,8 +2,8 @@ import std.algorithm;
 import std.array;
 import std.conv;
 import std.stdio;
-//import etc.linux.memoryerror;
 
+Coord boundary;
 struct Coord
 {
     int x;
@@ -21,10 +21,10 @@ struct Coord
 
     int quadrant() const
     {
-        if(x < boundary && y < boundary) return 1;
-        if(x < boundary && y > boundary) return 2;
-        if(x > boundary && y < boundary) return 3;
-        if(x > boundary && y > boundary) return 4;
+        if(x < boundary.x && y < boundary.y) return 1;
+        if(x < boundary.x && y > boundary.y) return 2;
+        if(x > boundary.x && y < boundary.y) return 3;
+        if(x > boundary.x && y > boundary.y) return 4;
         return 0;
     }
 
@@ -38,25 +38,18 @@ struct Coord
         switch(quadrant)
         {
             case 1:
-                return Coord(boundary -1, boundary -1);
+                return Coord(boundary.x -1, boundary.y -1);
             case 2:
-                return Coord(boundary - 1, boundary+1);
+                return Coord(boundary.x - 1, boundary.y+1);
             case 3:
-                return Coord(boundary+1, boundary-1);
+                return Coord(boundary.x + 1, boundary.y-1);
             case 4:
-                return Coord(boundary+1, boundary+1);
+                return Coord(boundary.x+1, boundary.y+1);
             default:
                 assert(false);
         }
     }
-
-    bool isCenter() const
-    {
-        return x == boundary && y == boundary;
-    }
 }
-
-enum Value { None, Wall, Key, Door };
 
 abstract class Field
 {
@@ -112,6 +105,11 @@ class Key : Field
         return cast(size_t)name;
     }
 
+    bool isSameQuadrant(Key other)
+    {
+        return this.location.isSameQuadrant(other.location);
+    }
+
     bool isBlockedBy(Key other)
     {
         if(auto blockedBy = other in blockedByKeys)
@@ -150,13 +148,13 @@ class Door : Field
 }
 
 Field[][] maze;
-Coord you;
 
 void parseFile()
 {
     auto lines = File("maze.txt").byLineCopy.array;
     auto height = lines.length.to!int;
     auto width = lines[0].length.to!int;
+    boundary = Coord(width/2, height/2);
     foreach(i; 0.. width)
     {
         maze ~= new Field[height];
@@ -176,7 +174,6 @@ void parseFile()
                     break;
                 case '@':
                     maze[x][y] = new Path;
-                    you = Coord(x, y);
                     break;
                 default:
                     if(element.isLowerCase)
@@ -194,6 +191,7 @@ auto allFields()
     return maze.joiner;
 }
 
+size_t amountOfKeys;
 auto allKeys()
 {
     return allFields.filter!(f => cast(Key)f).map!(f => cast(Key)f);
@@ -219,7 +217,8 @@ void findBlockingDoors()
 {
     foreach(Key key; allKeys)
     {
-        auto path = findPath(you, key.location);
+        amountOfKeys++;
+        auto path = findPath(key.location.startOfThisQuadrant, key.location);
         key.distanceToCenter = path.length;
         foreach(coord; path)
         {
@@ -230,9 +229,7 @@ void findBlockingDoors()
             auto otherKey = cast(Key)field;
             if(otherKey)
             {
-                //key.keysOnPath ~= otherKey;
                 key.blockedByKeys[otherKey] = true;
-                //otherKey.onThePathToKeys ~= key;
             }
         }
     }
@@ -260,54 +257,6 @@ void determineDistances()
             otherKey.distanceToKeys[key] = distance;
         }
     }
-}
-
-size_t gatherKeys(Key[] found, Key[] remaining)
-{
-    if(remaining.length == 1)
-    {
-        return remaining[0].distanceToKeys[found[$-1]];
-    }
-    //writeln("Found ", found);
-    Key[] reachableKeys;
-    Key[] unreachableKeys;
-    foreach (Key key; remaining)
-    {
-        if(key.isReachable(found))
-            reachableKeys ~= key;
-        else
-            unreachableKeys ~= key;
-    }
-    //writeln("Reachable ", reachableKeys);
-    size_t minDistance = size_t.max/2;
-    foreach(i, key; reachableKeys)
-    {
-        size_t distance;
-        if(found.length == 0)
-        {
-            distance = key.distanceToCenter;
-        }
-        else
-        {
-            distance = key.distanceToKeys[found.back];
-        }
-        auto keysNotGrabbed = reachableKeys[0 .. i] ~ reachableKeys [i + 1 .. $];
-        distance += gatherKeys(found ~ key, keysNotGrabbed ~ unreachableKeys);
-        if(distance < minDistance)
-        {
-            minDistance = distance;
-        }
-        if(found.length == 0)
-        {
-            writeln(minDistance);
-        }
-    }
-    return minDistance;
-}
-
-size_t gatherKeys()
-{
-    return gatherKeys([], allKeys.array);
 }
 
 void setUpMaze()
@@ -339,10 +288,6 @@ Coord[] findPath(Coord start, Coord end, Coord previousMove)
         {
             continue;
         }
-        if(isActualPuzzleInput && !start.isSameQuadrant(nextStop))
-        {
-            continue;
-        }
         auto result = findPath(nextStop, end, movement);
         if(result.length > 0)
         {
@@ -350,29 +295,6 @@ Coord[] findPath(Coord start, Coord end, Coord previousMove)
         }
     }
     return [];
-}
-
-Coord[] findPathAcrossQuadrants(Coord start, Coord end)
-{
-    Coord[] path;
-    if(start.isCenter)
-    {
-        path = [start, start]; // Doesn't really matter what direction we go.
-    }
-    else
-    {
-        if(start.quadrant + end.quadrant == 5)
-        {
-            path = [start, start, start, start]; // Add 4;
-        }
-        else
-        {
-            path = [start, start]; // Add 2
-        }
-        path ~= findPath(start, start.startOfThisQuadrant);
-    }
-    path ~= findPath(end.startOfThisQuadrant, end);
-    return path;
 }
 
 struct Navigation
@@ -415,31 +337,17 @@ Coord[] findPath(Coord start, Coord end)
     {
         return x.route;
     }
-    Coord[] route;
-    if(isActualPuzzleInput && !start.isSameQuadrant(end))
-    {
-        route = findPathAcrossQuadrants(start, end);
-    }
-    else
-    {
-        route = findPath(start, end, Coord(0,0));
-    }
+    Coord[] route = findPath(start, end, Coord(0,0));
     knownRoutes[nav] = WalkedPath(route);
     return route;
 }
 
 void main()
 {
-    //static if (is(typeof(registerMemoryErrorHandler)))
-    //    registerMemoryErrorHandler(); 
     setUpMaze();
     writeln("Set up maze");
-    //auto keys = determineOrder();
-    //keys.writeln;
-    //keys.gatherKeys.writeln;
     determineDistances();
     writeln("Determined distances");
-    //gatherKeys().writeln;
     findTotalDistanceBySorting().writeln;
 }
 
@@ -448,71 +356,6 @@ bool isLowerCase(char c)
     import std.ascii : toLower;
     return c == c.toLower;
 }
-
-bool isActualPuzzleInput()
-{
-    return maze.length > 2*boundary;
-}
-enum boundary = 40;
-
-/+
-bool isBlockedBy(Key first, Key other)
-{
-    auto cache = other in first.blockedByKeys;
-    if(cache)
-    {
-        return *cache;
-    }
-    else if(first.blockedBy.any!(door => door.required is other || door.required.isBlockedBy(other)))
-    {
-        first.blockedByKeys[other] = true;
-        return true;
-    }
-    first.blockedByKeys[other] = false;
-    return false;
-}
-+/
-
-/+
-size_t gatherKeys(Key[] keys)
-{
-    Key previousKey;
-    size_t totalSteps = 0;
-    //auto position = you;
-    foreach(key; keys)
-    {
-        size_t distance;
-        if(previousKey)
-        {
-            distance = key.distanceToKeys[previousKey];
-        }
-        else
-        {
-            distance = key.distanceToCenter;
-        }
-        totalSteps += distance;
-        //totalSteps += path.length;
-        //position = key.location;
-    }
-    return totalSteps;
-}
-+/
-
-/+
-size_t bruteForce()
-{
-    auto keys = allKeys.array;
-    auto minStepSize = size_t.max;
-    foreach(p; keys.permutations)
-    {
-        auto permutation = p.array;
-        if(!permutation.isValidSequence) continue;
-        auto stepSize = permutation.gatherKeys;
-        if(stepSize < minStepSize)
-            minStepSize = stepSize;
-    }
-    return minStepSize;
-}+/
 
 size_t totalDistance(Key[] keys)
 {
@@ -524,7 +367,17 @@ size_t totalDistance(Key[] keys)
     return sum;
 }
 
-size_t findLocalMinimum(Key[] keys)
+size_t totalDistance(Key[][4] keys)
+{
+    size_t sum = 0;
+    foreach(quadrant; keys)
+    {
+        sum += quadrant.totalDistance;
+    }
+    return sum;
+}
+
+size_t findLocalMinimum(Key[][4] keys)
 {
     keys = keys.determineOrder;
     size_t minimumDistance = keys.totalDistance;
@@ -532,39 +385,61 @@ size_t findLocalMinimum(Key[] keys)
     outer: while(hasSwapped)
     {
         hasSwapped = false;
-        foreach(i; 0 .. keys.length)
+        foreach(quadrant; keys)
         {
-            foreach (j; i .. keys.length)
+            foreach(i; 0 .. quadrant.length)
             {
-                swap(keys[i], keys[j]);
-                if(!keys.isValidSequence)
+                foreach (j; i .. quadrant.length)
                 {
-                    swap(keys[i], keys[j]);
-                    continue;
+                    swap(quadrant[i], quadrant[j]);
+                    if(!quadrant.isValidSequence || !keys.isSolvable)
+                    {
+                        swap(quadrant[i], quadrant[j]);
+                        continue;
+                    }
+                    size_t distance = keys.totalDistance;
+                    if(distance >= minimumDistance)
+                    {
+                        swap(quadrant[i], quadrant[j]);
+                        continue;
+                    }
+                    minimumDistance = distance;
+                    hasSwapped = true;
+                    continue outer;
                 }
-                size_t distance = keys.totalDistance;
-                if(distance >= minimumDistance)
-                {
-                    swap(keys[i], keys[j]);
-                    continue;
-                }
-                minimumDistance = distance;
-                hasSwapped = true;
-                continue outer;
             }
         }
     }
     return minimumDistance;
 }
 
-size_t findTotalDistanceBySorting()
+Key[][4] splitIntoQuadrants(Keys)(Keys keys)
+{
+    Key[][4] output;
+    foreach (Key key; keys)
+    {
+        output[key.location.quadrant - 1] ~= key;
+    }
+    return output;
+}
+
+Key[][4] shuffle(Key[][4] keys)
 {
     import std.random : randomShuffle;
-    Key[] keys = allKeys.array;
+    foreach(quadrant; keys)
+    {
+        randomShuffle(quadrant);
+    }
+    return keys;
+}
+
+size_t findTotalDistanceBySorting()
+{
+    auto keys = allKeys.splitIntoQuadrants;
     size_t globalMinimum = size_t.max;
     foreach(i; 0 .. 1000)
     {
-        randomShuffle(keys);
+        keys = shuffle(keys);
         auto localMinimum = keys.findLocalMinimum;
         if(localMinimum < globalMinimum)
         {
@@ -579,6 +454,11 @@ void swap(ref Key a, ref Key b)
     auto temp = a;
     a = b;
     b = temp;
+}
+
+Key[][4] determineOrder(Key[][4] keys)
+{
+    return keys[].joiner.array.determineOrder.splitIntoQuadrants;
 }
 
 Key[] determineOrder(Key[] keys)
@@ -601,10 +481,35 @@ Key[] determineOrder(Key[] keys)
         }
         isValid = keys.isValidSequence;
     }
-    //keys.sort!((prev, next) => next.isBlockedBy(prev));
     return keys;
 }
 
+bool isSolvable(Key[][4] keys)
+{
+    size_t[4] cursor;
+    Key[] receivedKeys;
+    bool keyReceived = true;
+    while(keyReceived)
+    {
+        keyReceived = false;
+        foreach(q, quadrant; keys)
+        {
+            size_t index = cursor[q];
+            if(index >= quadrant.length)
+            {
+                continue;
+            }
+            Key nextKey = quadrant[index];
+            if(nextKey.isReachable(receivedKeys))
+            {
+                cursor[q] = index + 1;
+                receivedKeys ~= nextKey;
+                keyReceived = true;
+            }
+        }
+    }
+    return receivedKeys.length == amountOfKeys;
+}
 
 bool isValidSequence(Key[] keys)
 {
@@ -618,15 +523,3 @@ bool isValidSequence(Key[] keys)
     }
     return true;
 }
-
-/+
-auto notFoundKeys(Key[] found)
-{
-    return allKeys.filter!(k => !found.any!(f => f is k));
-}
-
-auto reachableKeys(Key[] found)
-{
-    return notFoundKeys(found).filter!(k => k.isReachable(found));
-}
-+/
