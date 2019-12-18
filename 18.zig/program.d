@@ -84,15 +84,41 @@ class Key : Field
     const char name;
     const Coord location;
     Door[] blockedBy;
-    Key[] keysOnPath;
-    Key[] onThePathToKeys;
     bool[Key] blockedByKeys;
     size_t[Key] distanceToKeys;
     size_t distanceToCenter;
 
+    private void flatten(Key other)
+    {
+        foreach(door; other.blockedBy)
+        {
+            blockedByKeys[door.required] = true;
+            flatten(door.required);
+        }
+    }
+
+    void flatten()
+    {
+        flatten(this);
+    }
+
     override string toString()
     {
         return name ~ " " ~ location.to!string;
+    }
+
+    override size_t toHash() const @safe pure nothrow
+    {
+        return cast(size_t)name;
+    }
+
+    bool isBlockedBy(Key other)
+    {
+        if(auto blockedBy = other in blockedByKeys)
+        {
+            return *blockedBy;
+        }
+        return false;
     }
 
     bool isReachable(Key[] gatheredKeys)
@@ -173,16 +199,6 @@ auto allKeys()
     return allFields.filter!(f => cast(Key)f).map!(f => cast(Key)f);
 }
 
-auto notFoundKeys(Key[] found)
-{
-    return allKeys.filter!(k => !found.any!(f => f is k));
-}
-
-auto reachableKeys(Key[] found)
-{
-    return notFoundKeys(found).filter!(k => k.isReachable(found));
-}
-
 auto allDoors()
 {
     return allFields.filter!(f => cast(Door)f).map!(f => cast(Door)f);
@@ -208,34 +224,26 @@ void findBlockingDoors()
         foreach(coord; path)
         {
             auto field = maze[coord.x][coord.y];
+            if(field is key) continue;
             auto door = cast(Door)field;
             if(door) key.blockedBy ~= door;
             auto otherKey = cast(Key)field;
             if(otherKey)
             {
-                key.keysOnPath ~= otherKey;
+                //key.keysOnPath ~= otherKey;
                 key.blockedByKeys[otherKey] = true;
-                otherKey.onThePathToKeys ~= key;
+                //otherKey.onThePathToKeys ~= key;
             }
         }
     }
 }
 
-bool isBlockedBy(Key first, Key other)
+void flattenKeys()
 {
-    auto cache = other in first.blockedByKeys;
-    if(cache)
+    foreach (key; allKeys)
     {
-        return *cache;
+        key.flatten;
     }
-    else if(first.keysOnPath.any!(kop => kop is other) ||
-        first.blockedBy.any!(door => door.required is other || door.required.isBlockedBy(other)))
-    {
-        first.blockedByKeys[other] = true;
-        return true;
-    }
-    first.blockedByKeys[other] = false;
-    return false;
 }
 
 void determineDistances()
@@ -254,18 +262,24 @@ void determineDistances()
     }
 }
 
-Key[] determineOrder()
-{
-    auto keys = allKeys.array;
-    keys.sort!((prev, next) => next.isBlockedBy(prev));
-    return keys;
-}
-
 size_t gatherKeys(Key[] found, Key[] remaining)
 {
-    auto reachableKeys = remaining.filter!(r => r.isReachable(found)).array;
-    auto unreachableKeys = remaining.filter!(r => !reachableKeys.any!(rk => rk is r)).array;
-    size_t minDistance = size_t.max;
+    if(remaining.length == 1)
+    {
+        return remaining[0].distanceToKeys[found[$-1]];
+    }
+    //writeln("Found ", found);
+    Key[] reachableKeys;
+    Key[] unreachableKeys;
+    foreach (Key key; remaining)
+    {
+        if(key.isReachable(found))
+            reachableKeys ~= key;
+        else
+            unreachableKeys ~= key;
+    }
+    //writeln("Reachable ", reachableKeys);
+    size_t minDistance = size_t.max/2;
     foreach(i, key; reachableKeys)
     {
         size_t distance;
@@ -278,10 +292,14 @@ size_t gatherKeys(Key[] found, Key[] remaining)
             distance = key.distanceToKeys[found.back];
         }
         auto keysNotGrabbed = reachableKeys[0 .. i] ~ reachableKeys [i + 1 .. $];
-        distance += gatherKeys(found ~ key, keysNotGrabbed ~ remaining);
+        distance += gatherKeys(found ~ key, keysNotGrabbed ~ unreachableKeys);
         if(distance < minDistance)
         {
             minDistance = distance;
+        }
+        if(found.length == 0)
+        {
+            writeln(minDistance);
         }
     }
     return minDistance;
@@ -292,64 +310,12 @@ size_t gatherKeys()
     return gatherKeys([], allKeys.array);
 }
 
-/+
-size_t gatherKeys(Key[] keys)
-{
-    Key previousKey;
-    size_t totalSteps = 0;
-    //auto position = you;
-    foreach(key; keys)
-    {
-        size_t distance;
-        if(previousKey)
-        {
-            distance = key.distanceToKeys[previousKey];
-        }
-        else
-        {
-            distance = key.distanceToCenter;
-        }
-        totalSteps += distance;
-        //totalSteps += path.length;
-        //position = key.location;
-    }
-    return totalSteps;
-}
-+/
-
-bool isValidSequence(Key[] keys)
-{
-    foreach(i; 0 .. keys.length)
-    {
-        foreach(j; i + 1 .. keys.length)
-        {
-            if(keys[i].isBlockedBy(keys[j]))
-                return false;
-        }
-    }
-    return true;
-}
-/+
-size_t bruteForce()
-{
-    auto keys = allKeys.array;
-    auto minStepSize = size_t.max;
-    foreach(p; keys.permutations)
-    {
-        auto permutation = p.array;
-        if(!permutation.isValidSequence) continue;
-        auto stepSize = permutation.gatherKeys;
-        if(stepSize < minStepSize)
-            minStepSize = stepSize;
-    }
-    return minStepSize;
-}+/
-
 void setUpMaze()
 {
     parseFile();
     connectKeysToDoors();
     findBlockingDoors();
+    flattenKeys();
 }
 
 static immutable movement = [
@@ -467,11 +433,14 @@ void main()
     //static if (is(typeof(registerMemoryErrorHandler)))
     //    registerMemoryErrorHandler(); 
     setUpMaze();
+    writeln("Set up maze");
     //auto keys = determineOrder();
     //keys.writeln;
     //keys.gatherKeys.writeln;
     determineDistances();
-    gatherKeys().writeln;
+    writeln("Determined distances");
+    //gatherKeys().writeln;
+    findTotalDistanceBySorting().writeln;
 }
 
 bool isLowerCase(char c)
@@ -485,3 +454,179 @@ bool isActualPuzzleInput()
     return maze.length > 2*boundary;
 }
 enum boundary = 40;
+
+/+
+bool isBlockedBy(Key first, Key other)
+{
+    auto cache = other in first.blockedByKeys;
+    if(cache)
+    {
+        return *cache;
+    }
+    else if(first.blockedBy.any!(door => door.required is other || door.required.isBlockedBy(other)))
+    {
+        first.blockedByKeys[other] = true;
+        return true;
+    }
+    first.blockedByKeys[other] = false;
+    return false;
+}
++/
+
+/+
+size_t gatherKeys(Key[] keys)
+{
+    Key previousKey;
+    size_t totalSteps = 0;
+    //auto position = you;
+    foreach(key; keys)
+    {
+        size_t distance;
+        if(previousKey)
+        {
+            distance = key.distanceToKeys[previousKey];
+        }
+        else
+        {
+            distance = key.distanceToCenter;
+        }
+        totalSteps += distance;
+        //totalSteps += path.length;
+        //position = key.location;
+    }
+    return totalSteps;
+}
++/
+
+/+
+size_t bruteForce()
+{
+    auto keys = allKeys.array;
+    auto minStepSize = size_t.max;
+    foreach(p; keys.permutations)
+    {
+        auto permutation = p.array;
+        if(!permutation.isValidSequence) continue;
+        auto stepSize = permutation.gatherKeys;
+        if(stepSize < minStepSize)
+            minStepSize = stepSize;
+    }
+    return minStepSize;
+}+/
+
+size_t totalDistance(Key[] keys)
+{
+    size_t sum = keys[0].distanceToCenter;
+    foreach(i; 1 .. keys.length)
+    {
+        sum += keys[i].distanceToKeys[keys[i-1]];
+    }
+    return sum;
+}
+
+size_t findLocalMinimum(Key[] keys)
+{
+    keys = keys.determineOrder;
+    size_t minimumDistance = keys.totalDistance;
+    bool hasSwapped = true;
+    outer: while(hasSwapped)
+    {
+        hasSwapped = false;
+        foreach(i; 0 .. keys.length)
+        {
+            foreach (j; i .. keys.length)
+            {
+                swap(keys[i], keys[j]);
+                if(!keys.isValidSequence)
+                {
+                    swap(keys[i], keys[j]);
+                    continue;
+                }
+                size_t distance = keys.totalDistance;
+                if(distance >= minimumDistance)
+                {
+                    swap(keys[i], keys[j]);
+                    continue;
+                }
+                minimumDistance = distance;
+                hasSwapped = true;
+                continue outer;
+            }
+        }
+    }
+    return minimumDistance;
+}
+
+size_t findTotalDistanceBySorting()
+{
+    import std.random : randomShuffle;
+    Key[] keys = allKeys.array;
+    size_t globalMinimum = size_t.max;
+    foreach(i; 0 .. 1000)
+    {
+        randomShuffle(keys);
+        auto localMinimum = keys.findLocalMinimum;
+        if(localMinimum < globalMinimum)
+        {
+            globalMinimum = localMinimum;
+        }
+    }
+    return globalMinimum;
+}
+
+void swap(ref Key a, ref Key b)
+{
+    auto temp = a;
+    a = b;
+    b = temp;
+}
+
+Key[] determineOrder(Key[] keys)
+{
+    bool isValid = false;
+    while(!isValid)
+    {
+        outer: foreach_reverse(i; 0 .. keys.length)
+        {
+            auto laterKey = keys[i];
+            foreach_reverse(j; 0 .. i)
+            {
+                auto earlierKey = keys[j];
+                if(earlierKey.isBlockedBy(laterKey))
+                {
+                    swap(keys[i], keys[j]);
+                    continue outer;
+                }
+            }
+        }
+        isValid = keys.isValidSequence;
+    }
+    //keys.sort!((prev, next) => next.isBlockedBy(prev));
+    return keys;
+}
+
+
+bool isValidSequence(Key[] keys)
+{
+    foreach(i; 0 .. keys.length)
+    {
+        foreach(j; i + 1 .. keys.length)
+        {
+            if(keys[i].isBlockedBy(keys[j]))
+                return false;
+        }
+    }
+    return true;
+}
+
+/+
+auto notFoundKeys(Key[] found)
+{
+    return allKeys.filter!(k => !found.any!(f => f is k));
+}
+
+auto reachableKeys(Key[] found)
+{
+    return notFoundKeys(found).filter!(k => k.isReachable(found));
+}
++/
