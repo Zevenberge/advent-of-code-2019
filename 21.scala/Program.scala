@@ -12,7 +12,7 @@ class Computer {
     private var _input : BufferedWriter = null
     def start() : Unit = {
         val runtime = Runtime.getRuntime()
-        _process = runtime.exec("./intcode 2> log.txt | tee output.txt")
+        _process = runtime.exec("./intcode")
         val output = new InputStreamReader(_process.getInputStream())
         _output = new BufferedReader(output)
         val input = new OutputStreamWriter(_process.getOutputStream())
@@ -42,7 +42,12 @@ class Computer {
     }
 
     def readChar() : Char = {
-      receive().asInstanceOf[Char]
+      val output = receive()
+      if(output > 255)
+      {
+        println(output)
+      }
+      output.asInstanceOf[Char]
     }
 
     def readLine() : String = {
@@ -56,7 +61,6 @@ class Computer {
     }
 
     def readErrors() : Unit = {
-      println("Gathering errors...")
       val errorReader = new InputStreamReader(_process.getErrorStream())
       val anotherErrorReader = new BufferedReader(errorReader)
       var line = anotherErrorReader.readLine()
@@ -65,7 +69,6 @@ class Computer {
         println(line)
         line = anotherErrorReader.readLine()
       }
-      println("Error report finished")
     }
 }
 
@@ -90,6 +93,10 @@ class Springdroid(computer: Computer) {
   def walk() : Unit = {
     computer.sendLine("WALK")
   }
+
+  def run() : Unit = {
+    computer.sendLine("RUN")
+  }
 }
 
 object Program {
@@ -98,13 +105,24 @@ object Program {
       computer.start()
       print(computer.readLine())
       val droid = new Springdroid(computer)
-      droid.not('C', 'J');
-      droid.not('B', 'T');
-      droid.or('T', 'J');
-      droid.not('A', 'T');
-      droid.or('T', 'J');
-      droid.and('D', 'J');
-      droid.walk();
+      // Jump if a hole in ABC
+      droid.or('A', 'T')
+      droid.and('B', 'T')
+      droid.and('C', 'T')
+      // T is true if all the holes are footing.
+      droid.not('T', 'J')
+      // Only jump if D is a footing.
+      droid.and('D', 'J')
+
+      // Reset T to false
+      droid.and('J', 'T')
+
+      // Unless E and H are holes
+      droid.or('E', 'T')
+      droid.or('H', 'T')
+      droid.and('T', 'J')
+
+      droid.run()
       try {
         var line : String = "Hello"
         while(!line.isEmpty) {
@@ -115,10 +133,6 @@ object Program {
       catch {
         case _: Throwable => computer.readErrors()
       }
-      //computer.send(1001)
-      //computer.send(825)
-      
-    //println("Hello, world!")
   }
 }
 
