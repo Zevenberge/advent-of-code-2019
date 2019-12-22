@@ -1,62 +1,57 @@
 import std;
 
+//enum amountOfCards = 119315717514047L;
+enum amountOfCards = 10007;
+enum file = "input.txt";
+
 void main()
 {
-    size_t amountOfCards = 119315717514047;
-    size_t[] cards = iota(amountOfCards).array;
-    auto instructions = File("input.txt").byLineCopy.array;
-    foreach(line; File("input.txt").byLineCopy)
+    //size_t[] cards = iota(amountOfCards).array;
+    auto instructions = File(file).byLineCopy.array;
+    for(long end = 0; end < amountOfCards; end++)
     {
-        if(line.startsWith("deal with increment "))
+        long position = end;
+        foreach(line; instructions.retro)
         {
-            auto increment = line[20..$].to!size_t;
-            cards = cards.dealWithIncreament(increment);
+            if(line.startsWith("deal with increment "))
+            {
+                auto increment = line[20..$].to!size_t;
+                position = position.dealWithIncreament(increment);
+            }
+            else if(line.startsWith("cut "))
+            {
+                auto amount = line[4 .. $].to!long;
+                position = position.cutCards(amount);
+            }
+            else if(line == "deal into new stack")
+            {
+                position = position.reverseOrder;
+            }
+            else
+            {
+                assert(false, "Unknown line: "~ line);
+            }
         }
-        else if(line.startsWith("cut "))
-        {
-            auto amount = line[4 .. $].to!long;
-            cards = cards.cutCards(amount);
-        }
-        else if(line == "deal into new stack")
-        {
-            cards = cards.reverseOrder;
-        }
-        else
-        {
-            assert(false, "Unknown line: "~ line);
-        }
-    }
-    foreach(i, j; cards)
-    {
-        if(j == 2019)
-        {
-            writeln(i);
-        }
+        writeln(position);
+        
     }
 }
 
-size_t[] reverseOrder(size_t[] cards)
+long reverseOrder(long position)
 {
-    return cards.retro.array;
+    return (amountOfCards - 1)  - position;
 }
 
-size_t[] cutCards(size_t[] cards, long n)
+long cutCards(long position, long n)
 {
-    while(n < 0)
-    {
-        n = n + cards.length.to!long;
-    }
-    return cards[n .. $] ~ cards[0 .. n];
+    return (position + n + amountOfCards) % amountOfCards;
 }
 
-size_t[] dealWithIncreament(size_t[] cards, size_t n)
+long dealWithIncreament(long position, size_t n)
 {
-    size_t[] dealtCards = new size_t[cards.length];
-    size_t i = 0;
-    foreach(j, _; cards)
+    while(position % n != 0)
     {
-        dealtCards[i] = cards[j];
-        i = (i + n) % cards.length;
+        position = position + amountOfCards;
     }
-    return dealtCards;
+    return position / n;
 }
