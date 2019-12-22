@@ -3,8 +3,8 @@ import std.experimental.checkedint;
 import etc.linux.memoryerror;
 
 alias Long = Checked!long;
-//alias Instruction = Long delegate(Long);
 
+/// Reset the number such that x e [0, amountOfCards)
 Long putIntoCardBounds(Long x)
 {
     while(x >= amountOfCards)
@@ -18,51 +18,33 @@ Long putIntoCardBounds(Long x)
     return x;
 }
 
-/+
-Long signAfterMultiplying(Long a, Long b)
-{
-    bool isANegative = a < 0;
-    bool isBNegative = b < 0;
-    if(isANegative && isBNegative)
-    {
-        return Long(1L);
-    }
-    if(!isANegative && !isBNegative)
-    {
-        return Long(1L);
-    }
-    return Long(-1L);
-}
+/++ 
+    Simple multiply function:
+        c = a * b
+        c e [0, amountOfCards)
+    Prevents overflow in the process,
 +/
-
 Long limitMultiplicationBetweenCardBounds(Long a, Long b)
 {
     if(b > a) return limitMultiplicationBetweenCardBounds(b, a);
     if(b == 0) return Long(0);
     auto absA = Long(abs(a.get));
     auto absB = Long(abs(b.get));
-    //writeln("|A| ", a);
-    //writeln("|B| ", b);
     auto amountOfTimesAFitIntoCards = amountOfCards/ absA.get;
-    //writeln("AOTAFIC ", amountOfTimesAFitIntoCards);
     if(absB < amountOfTimesAFitIntoCards) return a * b;
     auto overshootWhenApplyingAToFitIntoCards = amountOfCards % absA.get;
-    //writeln("OWAATFIC ", overshootWhenApplyingAToFitIntoCards);
     auto amountOfTimesBCanFillTheCardsWithA = absB / amountOfTimesAFitIntoCards;
-    //writeln("AOTBCFTCWA ", amountOfTimesBCanFillTheCardsWithA);
     auto totalOvershoot = limitMultiplicationBetweenCardBounds(
         Long(overshootWhenApplyingAToFitIntoCards),
         Long(amountOfTimesBCanFillTheCardsWithA));
     totalOvershoot = putIntoCardBounds(-totalOvershoot);
-    //writeln("Total overshoot ", totalOvershoot);
     auto amountOfTimesBStillNeedsToBeApplied = absB % amountOfTimesAFitIntoCards;
-    //writeln("AOTBSNTOBA ", amountOfTimesBStillNeedsToBeApplied);
     auto result = 
         limitMultiplicationBetweenCardBounds(
                 absA, 
                 amountOfTimesBStillNeedsToBeApplied) 
         + totalOvershoot;
-    return putIntoCardBounds(result);// * signAfterMultiplying(a, b));
+    return putIntoCardBounds(result);
 }
 
 unittest
@@ -78,8 +60,16 @@ unittest
     assert(result == 7);
 }
 
+/++
+    Struct representing a first-order polynomal equation: f(x) = a x + b
+    We abuse the linearity of the problem: 
+        if g(x) = f o f(x)
+        then g o g(x) = (f o f)(f o f)(x) = f(f(f(f(x))))
+    This allows us to calculate the shuffling in O(1).
++/
 struct Equation
 {
+    /// Unity equation f(x) = x. Used for initial inputs.
     static Equation unity = Equation(Long(1), Long(0));
 
     // f(x) = a x + b
@@ -106,6 +96,12 @@ struct Equation
         assert(eq.b == 7);
     }
 
+    /++
+        Returns the function which is the other function applied before this is applied.
+            f(x) = this
+            g(x) = other
+            h(x) = f(g(x)) = this(other)
+    +/
     Equation opCall(Equation other)
     {
         auto newA = limitMultiplicationBetweenCardBounds(a, other.a);
@@ -137,15 +133,22 @@ struct Equation
         assert(gf.b == 2);
     }
 
+
+    /// Supplies the function argument x to the function. 
+    /// Returns y = a x + b; y e [0, amountOfCards)
     Long opCall(Long position)
     {
-        writeln("A:", a);
-        writeln("B:", b);
         return putIntoCardBounds(limitMultiplicationBetweenCardBounds(a, position) + b);
-        //return (a * position + b) % amountOfCards;
     }
+
 }
 
+/++
+    Abstract base class representing a shuffle instruction.
+    An instruction can heuristically apply a shuffle forward
+    or apply a shuffle backward (default).
+    They can also be applied as an equation to other operations.
++/
 abstract class Instruction
 {
     Long apply(Long position);
@@ -170,7 +173,6 @@ class DealWithIncrement : Instruction
             position = position + amountOfCards;
         }
         return Long(position.get / _increment.to!long);
-        //return position.dealWithIncreament(_increment);
     }
 
     override Long applyForward(Long position)
@@ -253,18 +255,15 @@ Instruction[] parseInstructions(string[] input)
         {
             auto increment = line[20..$].to!size_t;
             instructions[i] = new DealWithIncrement(increment);
-            //position = position.dealWithIncreament(increment);
         }
         else if(line.startsWith("cut "))
         {
             auto amount = line[4 .. $].to!long;
             instructions[i] = new CutCards(Long(amount));
-            //position = position.cutCards(amount);
         }
         else if(line == "deal into new stack")
         {
             instructions[i] = new ReverseOrder;
-            //position = position.reverseOrder;
         }
         else
         {
@@ -282,33 +281,35 @@ version(unittest)
 }
 else
 {
-    //enum amountOfCards = 119315717514047L;
-    enum amountOfCards = 10007;
+    enum amountOfCards = 119315717514047L;
     enum file = "input.txt";
     void main()
     {
         registerMemoryErrorHandler();
         auto instructions = File(file).byLineCopy.array.parseInstructions;
-        Long position = 2496;
+        Long position = 2020;
         Long amountOfIterations = 101741582076661L;
-        //writeln(amountOfCards - amountOfIterations);
-        enum amountOfRuns = 1;//8192 * 4;
-        //Long[] shifts = new Long[amountOfRuns];
-        //Long[] positions = new Long[amountOfRuns];
-        //Long positionBefore = position;
-        for(Long end = 0; end < amountOfRuns; end++)
-        {
-            position = instructions.applyAll(position);
-        }
-        writeln("Legitly: ", position);
+        // For some reason we cycle every (# card - 1).
+        // Our algorithm works "Forward". As in, given an initial position, 
+        // we calculate the final position of the card.
+        // The second question is backwards. Given a final position,
+        // calculate what card ended up there.
+        // We abuse the fact that our suffling is eventually cyclic in C.
+        // Going backward X steps is going forward C - X steps.
+        amountOfIterations = (amountOfCards -1) - amountOfIterations;
         auto eq = composeEquation(instructions);
-        auto result = eq(Long(2019));
-        //auto result = eq(position);
-        writeln("Linearly: ", result);
-        writeln("Dan.");
+        auto collection = hackEquations(eq);
+        auto greatEquation = buildTheGreatEquation(collection, amountOfIterations);
+        writeln("The great equation: ", greatEquation);
+        Long result = 2020L;
+        Long input = greatEquation(result);
+        writeln("Answer :", input);
+        writeln("Done.");
     }
 }
 
+/// Heuristically apply all instructions to find the previous position 
+/// (card if the first iterstion) that was slit into the current position.
 Long applyAll(Instruction[] instructions, Long position)
 {
     //int i = 0;
@@ -320,6 +321,7 @@ Long applyAll(Instruction[] instructions, Long position)
     return position;
 }
 
+/// Compose the linear equation corresponding to all shuffles.
 Equation composeEquation(Instruction[] instructions)
 {
     Equation equation = Equation.unity;
@@ -328,6 +330,38 @@ Equation composeEquation(Instruction[] instructions)
         equation = line(equation);
     }
     return equation;
+}
+
+/// Return the array of equations applied once, twice, four times, eight times, etc.
+Equation[64] hackEquations(Equation eq)
+{
+    Equation[64] output;
+    output[0] = eq;
+    foreach(i; 1.. 64)
+    {
+        output[i] = output[i-1](output[i-1]);
+    }
+    return output;
+}
+
+/++
+    Given the amount of iterations, compose the equation representing
+    all of the shuffles.
++/
+Equation buildTheGreatEquation(Equation[64] collection, Long amountOfIterations)
+{
+    long aoi = amountOfIterations.get;
+    writeln("Blue: ", aoi);
+    Equation greatEquation = Equation.unity;
+    foreach(bit; 0 .. 64)
+    {
+        if(aoi & 1L << bit)
+        {
+            //writeln("Putting bit ", bit, " with decimal value ", 1L << bit);
+            greatEquation = collection[bit](greatEquation);
+        }
+    }
+    return greatEquation;
 }
 
 Long reverseOrder(Long position)
