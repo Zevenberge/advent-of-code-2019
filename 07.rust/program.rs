@@ -4,46 +4,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::thread;
 
-trait Output {
-   fn write(&mut self, number: i32);
-}
-
-trait Input {
-   fn canRead(&self) -> bool;
-   fn read(&mut self) -> i32;
-}
-
-struct Pipe {
-   messages: [i32; 32],
-   sentIndex: Cursor,
-   receivedIndex: Cursor,
-}
-
-impl Pipe {
-   fn new (default: i32) -> Pipe {
-      Pipe {messages: [default; 32], sentIndex: 0, receivedIndex: 0}
-   }
-}
-
-impl Output for Pipe {
-   fn write(&mut self, number: i32) {
-      self.messages[self.sentIndex] = number;
-      self.sentIndex = self.sentIndex + 1;
-   }
-}
-
-impl Input for Pipe {
-   fn canRead(&self) -> bool {
-      self.sentIndex > self.receivedIndex
-   }
-
-   fn read(&mut self) -> i32 {
-      let output: i32 = self.messages[self.receivedIndex];
-      self.receivedIndex = self.receivedIndex + 1;
-      output
-   }
-}
-
 type Modes = [i32; 3];
 type Cursor = usize;
 
