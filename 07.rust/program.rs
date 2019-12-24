@@ -1,4 +1,8 @@
 use std::convert::TryInto;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::thread;
 
 trait Output {
    fn write(&mut self, number: i32);
@@ -42,14 +46,6 @@ impl Input for Pipe {
 
 type Modes = [i32; 3];
 type Cursor = usize;
-
-struct Computer<'a> {
-   program: &'a mut [i32],
-   input: &'a mut Input,
-   output: &'a mut Output,
-   cursor: Cursor,
-   done: bool,
-}
 
 trait ConvertToUsize {
    fn toUsize(self) -> usize;
@@ -121,16 +117,18 @@ fn getMode (instruction: i32, n: i32) -> i32 {
    }
 }
 
+struct Computer<'a> {
+   program: &'a mut [i32],
+   input: Receiver<i32>,
+   output: Sender<i32>,
+}
+
 impl Computer<'_> {
 
    fn run(&mut self) {
-      if self.cursor == 0 {
-         println!("Starting computer");
-      } else {
-         println!("Resuming program");
-      }
+      let mut cursor: Cursor = 0;
       loop {
-         let instruction = self.program[self.cursor];
+         let instruction = self.program[cursor];
          let operation = instruction % 100;
          let modes = [
             getMode(instruction, 1),
@@ -139,43 +137,40 @@ impl Computer<'_> {
          ];
          match operation {
             1 => {
-               self.replace(self.cursor, getAddedValue(self.program, self.cursor, modes));
-               self.cursor = self.cursor + 4;
+               self.replace(cursor, getAddedValue(self.program, cursor, modes));
+               cursor = cursor + 4;
             },
             2 => {
-               self.replace(self.cursor, getMultipliedValue(self.program, self.cursor, modes));
-               self.cursor = self.cursor + 4;
+               self.replace(cursor, getMultipliedValue(self.program, cursor, modes));
+               cursor = cursor + 4;
             },
             3 => {
-               if self.input.canRead() {
-                  let int = self.input.read();
-                  self.program[self.program[self.cursor+1].toUsize()] = int;
-                  self.cursor = self.cursor + 2;
-               }
-               else {
-                  break;
-               }
+               let int = self.input.recv().unwrap();
+               self.program[self.program[cursor+1].toUsize()] = int;
+               cursor = cursor + 2;
+
             },
             4 => {
-               self.output.write(getElement(self.program, self.cursor+1, modes[0]));
-               self.cursor = self.cursor + 2;
+               self.output.send(getElement(self.program, cursor+1, modes[0])).unwrap();
+               cursor = cursor + 2;
             },
             5 => {
-               self.cursor = jumpIfTrue(self.program, self.cursor, modes);
+               cursor = jumpIfTrue(self.program, cursor, modes);
             },
             6 => {
-               self.cursor = jumpIfFalse(self.program, self.cursor, modes);
+               cursor = jumpIfFalse(self.program, cursor, modes);
             },
             7 => {
-               self.replace(self.cursor, lessThan(self.program, self.cursor, modes));
-               self.cursor = self.cursor + 4;
+               self.replace(cursor, lessThan(self.program, cursor, modes));
+               cursor = cursor + 4;
             },
             8 => {
-               self.replace(self.cursor, equals(self.program, self.cursor, modes));
-               self.cursor = self.cursor + 4;
+               self.replace(cursor, equals(self.program, cursor, modes));
+               cursor = cursor + 4;
             },
             99 => {
-               self.done = true;
+               self.output.send(-1).unwrap();
+               //drop(self.input);
                break;
             },
             _ => {
@@ -199,123 +194,100 @@ fn puzzleInput() -> [i32; 527] {
    [3,8,1001,8,10,8,105,1,0,0,21,42,67,84,109,122,203,284,365,446,99999,3,9,1002,9,3,9,1001,9,5,9,102,4,9,9,1001,9,3,9,4,9,99,3,9,1001,9,5,9,1002,9,3,9,1001,9,4,9,102,3,9,9,101,3,9,9,4,9,99,3,9,101,5,9,9,1002,9,3,9,101,5,9,9,4,9,99,3,9,102,5,9,9,101,5,9,9,102,3,9,9,101,3,9,9,102,2,9,9,4,9,99,3,9,101,2,9,9,1002,9,3,9,4,9,99,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,99,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,101,1,9,9,4,9,99]
 }
 
-fn buildPipes(setting: Vec<i32>) -> Vec<Pipe> {
-   let mut pipes : Vec<Pipe> = setting.iter().map(|s| {
-      let mut pipe = Pipe::new(-999);
-      pipe.write(*s);
-      pipe
-   }).collect();
-   pipes[0].write(0);
-   pipes
-}
-/*
-fn buildComputers(pipes: Vec<Pipe>) -> Vec<Computer> {
-   let mut computers : Vec<Computer> = Vec::new();
-   let amountOfPipes = pipes.len();
-   for i in 0 .. amountOfPipes {
+fn findThrusterSignalForSetting(setting: Vec<i32>) -> i32 {
+   let (txOA, rxOA) = channel();
+   txOA.send(setting[0]).unwrap();
+   let (txAB, rxAB) = channel();
+   txAB.send(setting[1]).unwrap();
+   let (txBC, rxBC) = channel();
+   txBC.send(setting[2]).unwrap();
+   let (txCD, rxCD) = channel();
+   txCD.send(setting[3]).unwrap();
+   let (txDE, rxDE) = channel();
+   txDE.send(setting[4]).unwrap();
+   let (txEO, rxEO) = channel();
+
+   // A
+   thread::spawn(move || {
       let mut program = puzzleInput();
       let mut computer = Computer {
          program: &mut program,
-         input: &mut pipes[i],
-         output: &mut pipes[(i+1)%amountOfPipes],
-         cursor: 0,
-         done: false
+         input: rxOA,
+         output: txAB,
       };
-      computers.push(computer);
-   }
-   computers;
-}*/
-/*
-fn runUntilCompletion(computers: &Vec<&mut Computer>) {
+      computer.run();
+   });
+
+   // B
+   thread::spawn(move || {
+      let mut program = puzzleInput();
+      let mut computer = Computer {
+         program: &mut program,
+         input: rxAB,
+         output: txBC,
+      };
+      computer.run();
+   });
+
+   // C
+   thread::spawn(move || {
+      let mut program = puzzleInput();
+      let mut computer = Computer {
+         program: &mut program,
+         input: rxBC,
+         output: txCD,
+      };
+      computer.run();
+   });
+
+   // D
+   thread::spawn(move || {
+      let mut program = puzzleInput();
+      let mut computer = Computer {
+         program: &mut program,
+         input: rxCD,
+         output: txDE,
+      };
+      computer.run();
+   });
+
+   // E
+   thread::spawn(move || {
+      let mut program = puzzleInput();
+      let mut computer = Computer {
+         program: &mut program,
+         input: rxDE,
+         output: txEO,
+      };
+      computer.run();
+   });
+
+   txOA.send(0).unwrap();
+   let mut lastVal = 0;
    loop {
-      for computer in computers {
-         computer.run();
-      }
-      if computers[4].done {
+      let val = rxEO.recv().unwrap();
+      if val != -1 {
+         lastVal = val;
+      } else {
          break;
       }
-   }
-}*/
-
-struct State {
-   program: [i32; 527 ],
-   cursor: Cursor,
-   done: bool
-}
-
-fn buildState(amount: usize) -> Vec<State> {
-   let mut states: Vec<State> = Vec::new();
-   for _ in 0 .. amount {
-      states.push(State {
-         program: puzzleInput(),
-         cursor: 0,
-         done: false
-      })
-   }
-   states
-}
-
-fn findThrusterSignalForSetting(setting: Vec<i32>) -> i32 {
-   let mut pipe = Pipe::new(-666);
-   pipe.write(setting[0]);
-   pipe.write(0);
-   let mut lastValue: i32 = 0;
-   let mut firstRound: bool = true;
-   let amount = setting.len();
-   let mut states = buildState(amount);
-
-   loop {
-      for i in 0 .. amount {
-         let mut output = Pipe::new(-666);
-         let mut cursor = states[i].cursor;
-         let mut done = states[i].done;
-         let mut program = states[i].program;
-         {
-            let mut computer = Computer {
-               program: &mut program,
-               input: &mut pipe,
-               output: &mut output,
-               cursor: cursor,
-               done: done
-            };
-            computer.run();
-            cursor = computer.cursor;
-            done = computer.done;
-         }
-         states[i].program = program;
-         states[i].cursor = cursor;
-         states[i].done = done;
-         pipe = Pipe::new(-666);
-         if i < amount - 1 && firstRound {
-            pipe.write(setting[i+1]);
-         }
-         if output.canRead() {
-            loop {
-               lastValue = output.read();
-               pipe.write(lastValue);
-               if !output.canRead() {
-                  break;
-               }
-            }
-         }
-      }
-      firstRound = false;
-      if states[4].done {
-         break;
+      match txOA.send(val) {
+         Ok(_x) => {},
+         Err(_x) => break,
       }
    }
-   lastValue
+   lastVal
 }
 
 fn findThrusterSignal() -> i32 {
    let phaseSettings = [5,6,7,8,9];
-   let mut possibleSettings = permutations(phaseSettings.to_vec());
+   let possibleSettings = permutations(phaseSettings.to_vec());
    let mut maxThrusterSignal: i32 = 0;
    for setting in possibleSettings {
       let thrusterSignal = findThrusterSignalForSetting(setting);
       if thrusterSignal > maxThrusterSignal {
          maxThrusterSignal = thrusterSignal;
-      }()
+      }
    }
    maxThrusterSignal
 }
