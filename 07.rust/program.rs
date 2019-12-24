@@ -194,84 +194,41 @@ fn puzzleInput() -> [i32; 527] {
    [3,8,1001,8,10,8,105,1,0,0,21,42,67,84,109,122,203,284,365,446,99999,3,9,1002,9,3,9,1001,9,5,9,102,4,9,9,1001,9,3,9,4,9,99,3,9,1001,9,5,9,1002,9,3,9,1001,9,4,9,102,3,9,9,101,3,9,9,4,9,99,3,9,101,5,9,9,1002,9,3,9,101,5,9,9,4,9,99,3,9,102,5,9,9,101,5,9,9,102,3,9,9,101,3,9,9,102,2,9,9,4,9,99,3,9,101,2,9,9,1002,9,3,9,4,9,99,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,99,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,99,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,101,1,9,9,4,9,99]
 }
 
+fn spawnComputer(receiver: Receiver<i32>) -> (Sender<i32>, Receiver<i32>) {
+   let (tx, rx) = channel();
+   let secondSender = tx.clone();
+   thread::spawn(move || {
+      let mut program = puzzleInput();
+      let mut computer = Computer {
+         program: &mut program,
+         input: receiver,
+         output: secondSender,
+      };
+      computer.run();
+   });
+   (tx, rx)
+} 
+
 fn findThrusterSignalForSetting(setting: Vec<i32>) -> i32 {
-   let (txOA, rxOA) = channel();
-   txOA.send(setting[0]).unwrap();
-   let (txAB, rxAB) = channel();
-   txAB.send(setting[1]).unwrap();
-   let (txBC, rxBC) = channel();
-   txBC.send(setting[2]).unwrap();
-   let (txCD, rxCD) = channel();
-   txCD.send(setting[3]).unwrap();
-   let (txDE, rxDE) = channel();
-   txDE.send(setting[4]).unwrap();
-   let (txEO, rxEO) = channel();
+   let (mut transmitter, mut receiver) = channel();
+   let transmitterToA = transmitter.clone();
+   for s in setting {
+      transmitter.send(s).unwrap();
+      let (tx, rx) = spawnComputer(receiver);
+      transmitter = tx;
+      receiver = rx;
+   }
 
-   // A
-   thread::spawn(move || {
-      let mut program = puzzleInput();
-      let mut computer = Computer {
-         program: &mut program,
-         input: rxOA,
-         output: txAB,
-      };
-      computer.run();
-   });
-
-   // B
-   thread::spawn(move || {
-      let mut program = puzzleInput();
-      let mut computer = Computer {
-         program: &mut program,
-         input: rxAB,
-         output: txBC,
-      };
-      computer.run();
-   });
-
-   // C
-   thread::spawn(move || {
-      let mut program = puzzleInput();
-      let mut computer = Computer {
-         program: &mut program,
-         input: rxBC,
-         output: txCD,
-      };
-      computer.run();
-   });
-
-   // D
-   thread::spawn(move || {
-      let mut program = puzzleInput();
-      let mut computer = Computer {
-         program: &mut program,
-         input: rxCD,
-         output: txDE,
-      };
-      computer.run();
-   });
-
-   // E
-   thread::spawn(move || {
-      let mut program = puzzleInput();
-      let mut computer = Computer {
-         program: &mut program,
-         input: rxDE,
-         output: txEO,
-      };
-      computer.run();
-   });
-
-   txOA.send(0).unwrap();
+   transmitterToA.send(0).unwrap();
    let mut lastVal = 0;
    loop {
-      let val = rxEO.recv().unwrap();
+      let val = receiver.recv().unwrap();
       if val != -1 {
          lastVal = val;
       } else {
          break;
       }
-      match txOA.send(val) {
+      match transmitterToA.send(val) {
          Ok(_x) => {},
          Err(_x) => break,
       }
