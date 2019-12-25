@@ -87,16 +87,3 @@ object Program {
       }
   }
 }
-
-case class Point(x: Int, y: Int)
-
-class Greetert(prefix: String, suffix: String) {
-  def greet(name: String): Unit =
-    println(prefix + name + suffix)
-}
-
-trait Greeter {
-  def greet(name: String): Unit
-}
-
-//val animals = ArrayBuffer.empty[Greeter]
